@@ -1,0 +1,249 @@
+<html>
+<head>
+<title>views.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #a9b7c6;}
+.s1 { color: #cc7832;}
+.s2 { color: #6a8759;}
+.s3 { color: #629755; font-style: italic;}
+.s4 { color: #808080;}
+.s5 { color: #6897bb;}
+</style>
+</head>
+<body bgcolor="#2b2b2b">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+views.py</font>
+</center></td></tr></table>
+<pre>
+<span class="s1">import </span><span class="s0">pandas </span><span class="s1">as </span><span class="s0">pd</span>
+<span class="s1">import </span><span class="s0">numpy </span><span class="s1">as </span><span class="s0">np</span>
+<span class="s1">from </span><span class="s0">keras.models </span><span class="s1">import </span><span class="s0">Sequential</span>
+<span class="s1">from </span><span class="s0">keras.layers.convolutional </span><span class="s1">import </span><span class="s0">Convolution2D</span><span class="s1">, </span><span class="s0">MaxPooling2D</span><span class="s1">, </span><span class="s0">ZeroPadding2D</span>
+<span class="s1">import </span><span class="s0">cv2</span>
+<span class="s1">from </span><span class="s0">django.shortcuts </span><span class="s1">import </span><span class="s0">render</span>
+<span class="s1">from </span><span class="s0">django.http </span><span class="s1">import </span><span class="s0">HttpResponse</span>
+
+<span class="s1">from </span><span class="s0">PIL </span><span class="s1">import </span><span class="s0">Image</span>
+<span class="s1">from </span><span class="s0">tqdm </span><span class="s1">import </span><span class="s0">tqdm</span>
+<span class="s1">import </span><span class="s0">os</span>
+
+<span class="s1">from </span><span class="s0">keras.layers </span><span class="s1">import </span><span class="s0">Dense</span><span class="s1">, </span><span class="s0">Dropout</span><span class="s1">, </span><span class="s0">Flatten</span>
+<span class="s1">from </span><span class="s0">keras.layers </span><span class="s1">import </span><span class="s0">Conv2D</span>
+<span class="s1">from </span><span class="s0">keras.optimizers </span><span class="s1">import </span><span class="s0">Adam</span>
+<span class="s1">from </span><span class="s0">tensorflow.keras.preprocessing.image </span><span class="s1">import </span><span class="s0">ImageDataGenerator</span>
+
+
+
+<span class="s1">def </span><span class="s0">home(request):</span>
+    <span class="s1">return </span><span class="s0">render(request</span><span class="s1">,</span><span class="s2">'home.html'</span><span class="s0">)</span>
+
+
+<span class="s1">def </span><span class="s0">datasett_prepare(request):</span>
+    <span class="s3">'''This function create training and testing folders with images. 
+    It is creating using fer2013csv and do only once in a project.'''</span>
+    <span class="s4"># convert string to integer</span>
+    <span class="s1">def </span><span class="s0">atoi(s):</span>
+        <span class="s0">n = </span><span class="s5">0</span>
+        <span class="s1">for </span><span class="s0">i </span><span class="s1">in </span><span class="s0">s:</span>
+            <span class="s0">n = n * </span><span class="s5">10 </span><span class="s0">+ ord(i) - ord(</span><span class="s2">&quot;0&quot;</span><span class="s0">)</span>
+        <span class="s1">return </span><span class="s0">n</span>
+
+    <span class="s4"># making folders</span>
+    <span class="s0">outer_names = [</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test'</span><span class="s1">,</span>
+                   <span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train'</span><span class="s0">]</span>
+    <span class="s0">inner_names = [</span><span class="s2">'angry'</span><span class="s1">, </span><span class="s2">'disgusted'</span><span class="s1">, </span><span class="s2">'fearful'</span><span class="s1">, </span><span class="s2">'happy'</span><span class="s1">, </span><span class="s2">'sad'</span><span class="s1">, </span><span class="s2">'surprised'</span><span class="s1">, </span><span class="s2">'neutral'</span><span class="s0">]</span>
+    <span class="s0">os.makedirs(</span><span class="s2">'data'</span><span class="s1">, </span><span class="s0">exist_ok=</span><span class="s1">True</span><span class="s0">)</span>
+    <span class="s1">for </span><span class="s0">outer_name </span><span class="s1">in </span><span class="s0">outer_names:</span>
+        <span class="s0">os.makedirs(os.path.join(</span><span class="s2">'data'</span><span class="s1">, </span><span class="s0">outer_name)</span><span class="s1">, </span><span class="s0">exist_ok=</span><span class="s1">True</span><span class="s0">)</span>
+        <span class="s1">for </span><span class="s0">inner_name </span><span class="s1">in </span><span class="s0">inner_names:</span>
+            <span class="s0">os.makedirs(os.path.join(</span><span class="s2">'data'</span><span class="s1">, </span><span class="s0">outer_name</span><span class="s1">, </span><span class="s0">inner_name)</span><span class="s1">, </span><span class="s0">exist_ok=</span><span class="s1">True</span><span class="s0">)</span>
+    <span class="s4"># to keep count of each category</span>
+    <span class="s0">angry = </span><span class="s5">0</span>
+    <span class="s0">disgusted = </span><span class="s5">0</span>
+    <span class="s0">fearful = </span><span class="s5">0</span>
+    <span class="s0">happy = </span><span class="s5">0</span>
+    <span class="s0">sad = </span><span class="s5">0</span>
+    <span class="s0">surprised = </span><span class="s5">0</span>
+    <span class="s0">neutral = </span><span class="s5">0</span>
+    <span class="s0">angry_test = </span><span class="s5">0</span>
+    <span class="s0">disgusted_test = </span><span class="s5">0</span>
+    <span class="s0">fearful_test = </span><span class="s5">0</span>
+    <span class="s0">happy_test = </span><span class="s5">0</span>
+    <span class="s0">sad_test = </span><span class="s5">0</span>
+    <span class="s0">surprised_test = </span><span class="s5">0</span>
+    <span class="s0">neutral_test = </span><span class="s5">0</span>
+
+    <span class="s0">df = pd.read_csv(</span><span class="s2">&quot;C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">fer2013.csv&quot;</span><span class="s0">)</span>
+    <span class="s0">mat = np.zeros((</span><span class="s5">48</span><span class="s1">, </span><span class="s5">48</span><span class="s0">)</span><span class="s1">, </span><span class="s0">dtype=np.uint8)</span>
+    <span class="s0">print(</span><span class="s2">&quot;Saving images...&quot;</span><span class="s0">)</span>
+
+    <span class="s4"># read the csv file line by line</span>
+    <span class="s1">for </span><span class="s0">i </span><span class="s1">in </span><span class="s0">tqdm(range(len(df))):</span>
+        <span class="s0">txt = df[</span><span class="s2">'pixels'</span><span class="s0">][i]</span>
+        <span class="s0">words = txt.split()</span>
+
+        <span class="s4"># the image size is 48x48</span>
+        <span class="s1">for </span><span class="s0">j </span><span class="s1">in </span><span class="s0">range(</span><span class="s5">2304</span><span class="s0">):</span>
+            <span class="s0">xind = j // </span><span class="s5">48</span>
+            <span class="s0">yind = j % </span><span class="s5">48</span>
+            <span class="s0">mat[xind][yind] = atoi(words[j])</span>
+
+        <span class="s0">img = Image.fromarray(mat)</span>
+
+        <span class="s4"># train</span>
+        <span class="s1">if </span><span class="s0">i &lt; </span><span class="s5">28709</span><span class="s0">:</span>
+            <span class="s1">if </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">0</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train</span><span class="s1">\\</span><span class="s2">angry</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(angry) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">angry += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">1</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train</span><span class="s1">\\</span><span class="s2">disgusted</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(disgusted) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">disgusted += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">2</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train</span><span class="s1">\\</span><span class="s2">fearful</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(fearful) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">fearful += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">3</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train</span><span class="s1">\\</span><span class="s2">happy</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(happy) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">happy += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">4</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train</span><span class="s1">\\</span><span class="s2">sad</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(sad) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">sad += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">5</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train</span><span class="s1">\\</span><span class="s2">surprised</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(surprised) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">surprised += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">6</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train</span><span class="s1">\\</span><span class="s2">neutral</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(neutral) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">neutral += </span><span class="s5">1</span>
+
+        <span class="s4"># test</span>
+        <span class="s1">else</span><span class="s0">:</span>
+            <span class="s1">if </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">0</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test</span><span class="s1">\\</span><span class="s2">angry</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(angry_test) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">angry_test += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">1</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test</span><span class="s1">\\</span><span class="s2">disgusted</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(disgusted_test) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">disgusted_test += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">2</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test</span><span class="s1">\\</span><span class="s2">fearful</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(fearful_test) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">fearful_test += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">3</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test</span><span class="s1">\\</span><span class="s2">happy</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(happy_test) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">happy_test += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">4</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test</span><span class="s1">\\</span><span class="s2">sad</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(sad_test) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">sad_test += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">5</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test</span><span class="s1">\\</span><span class="s2">surprised</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(surprised_test) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">surprised_test += </span><span class="s5">1</span>
+            <span class="s1">elif </span><span class="s0">df[</span><span class="s2">'emotion'</span><span class="s0">][i] == </span><span class="s5">6</span><span class="s0">:</span>
+                <span class="s0">img.save(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test</span><span class="s1">\\</span><span class="s2">neutral</span><span class="s1">\\</span><span class="s2">im' </span><span class="s0">+ str(neutral_test) + </span><span class="s2">'.png'</span><span class="s0">)</span>
+                <span class="s0">neutral_test += </span><span class="s5">1</span>
+
+    <span class="s0">print(</span><span class="s2">&quot;Done!&quot;</span><span class="s0">)</span>
+    <span class="s1">return </span><span class="s0">HttpResponse(</span><span class="s2">'done'</span><span class="s0">)</span>
+
+
+<span class="s1">def </span><span class="s0">emotion_identify(request):</span>
+
+    <span class="s0">mode = </span><span class="s2">'display'</span>
+    <span class="s4"># Define data generators</span>
+    <span class="s0">train_dir = </span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">train'</span>
+    <span class="s0">val_dir = </span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">test'</span>
+    <span class="s4">#parameters setting</span>
+    <span class="s0">num_train = </span><span class="s5">28709</span>
+    <span class="s0">num_val = </span><span class="s5">7178</span>
+    <span class="s0">batch_size = </span><span class="s5">64</span>
+    <span class="s0">num_epoch = </span><span class="s5">2</span>
+
+    <span class="s0">train_datagen = ImageDataGenerator(rescale=</span><span class="s5">1. </span><span class="s0">/ </span><span class="s5">255</span><span class="s0">)</span>
+    <span class="s0">val_datagen = ImageDataGenerator(rescale=</span><span class="s5">1. </span><span class="s0">/ </span><span class="s5">255</span><span class="s0">)</span>
+
+    <span class="s0">train_generator = train_datagen.flow_from_directory(</span>
+        <span class="s0">train_dir</span><span class="s1">,</span>
+        <span class="s0">target_size=(</span><span class="s5">48</span><span class="s1">, </span><span class="s5">48</span><span class="s0">)</span><span class="s1">,</span>
+        <span class="s0">batch_size=batch_size</span><span class="s1">,</span>
+        <span class="s0">color_mode=</span><span class="s2">&quot;grayscale&quot;</span><span class="s1">,</span>
+        <span class="s0">class_mode=</span><span class="s2">'categorical'</span><span class="s0">)</span>
+
+    <span class="s0">validation_generator = val_datagen.flow_from_directory(</span>
+        <span class="s0">val_dir</span><span class="s1">,</span>
+        <span class="s0">target_size=(</span><span class="s5">48</span><span class="s1">, </span><span class="s5">48</span><span class="s0">)</span><span class="s1">,</span>
+        <span class="s0">batch_size=batch_size</span><span class="s1">,</span>
+        <span class="s0">color_mode=</span><span class="s2">&quot;grayscale&quot;</span><span class="s1">,</span>
+        <span class="s0">class_mode=</span><span class="s2">'categorical'</span><span class="s0">)</span>
+
+    <span class="s4"># Create the model</span>
+    <span class="s0">model = Sequential()</span>
+
+    <span class="s0">model.add(Conv2D(</span><span class="s5">32</span><span class="s1">, </span><span class="s0">kernel_size=(</span><span class="s5">3</span><span class="s1">, </span><span class="s5">3</span><span class="s0">)</span><span class="s1">, </span><span class="s0">activation=</span><span class="s2">'relu'</span><span class="s1">, </span><span class="s0">input_shape=(</span><span class="s5">48</span><span class="s1">, </span><span class="s5">48</span><span class="s1">, </span><span class="s5">1</span><span class="s0">)))</span>
+    <span class="s0">model.add(Conv2D(</span><span class="s5">64</span><span class="s1">, </span><span class="s0">kernel_size=(</span><span class="s5">3</span><span class="s1">, </span><span class="s5">3</span><span class="s0">)</span><span class="s1">, </span><span class="s0">activation=</span><span class="s2">'relu'</span><span class="s0">))</span>
+    <span class="s0">model.add(MaxPooling2D(pool_size=(</span><span class="s5">2</span><span class="s1">, </span><span class="s5">2</span><span class="s0">)))</span>
+    <span class="s0">model.add(Dropout(</span><span class="s5">0.25</span><span class="s0">))</span>
+
+    <span class="s0">model.add(Conv2D(</span><span class="s5">128</span><span class="s1">, </span><span class="s0">kernel_size=(</span><span class="s5">3</span><span class="s1">, </span><span class="s5">3</span><span class="s0">)</span><span class="s1">, </span><span class="s0">activation=</span><span class="s2">'relu'</span><span class="s0">))</span>
+    <span class="s0">model.add(MaxPooling2D(pool_size=(</span><span class="s5">2</span><span class="s1">, </span><span class="s5">2</span><span class="s0">)))</span>
+    <span class="s0">model.add(Conv2D(</span><span class="s5">128</span><span class="s1">, </span><span class="s0">kernel_size=(</span><span class="s5">3</span><span class="s1">, </span><span class="s5">3</span><span class="s0">)</span><span class="s1">, </span><span class="s0">activation=</span><span class="s2">'relu'</span><span class="s0">))</span>
+    <span class="s0">model.add(MaxPooling2D(pool_size=(</span><span class="s5">2</span><span class="s1">, </span><span class="s5">2</span><span class="s0">)))</span>
+    <span class="s0">model.add(Dropout(</span><span class="s5">0.25</span><span class="s0">))</span>
+
+    <span class="s0">model.add(Flatten())</span>
+    <span class="s0">model.add(Dense(</span><span class="s5">1024</span><span class="s1">, </span><span class="s0">activation=</span><span class="s2">'relu'</span><span class="s0">))</span>
+    <span class="s0">model.add(Dropout(</span><span class="s5">0.5</span><span class="s0">))</span>
+    <span class="s0">model.add(Dense(</span><span class="s5">7</span><span class="s1">, </span><span class="s0">activation=</span><span class="s2">'softmax'</span><span class="s0">))</span>
+
+    <span class="s4"># If you want to train the same model or try other models, go for this</span>
+    <span class="s1">if </span><span class="s0">mode == </span><span class="s2">&quot;train&quot;</span><span class="s0">:</span>
+        <span class="s0">model.compile(loss=</span><span class="s2">'categorical_crossentropy'</span><span class="s1">, </span><span class="s0">optimizer=Adam(learning_rate=</span><span class="s5">0.0001</span><span class="s1">, </span><span class="s0">decay=</span><span class="s5">1e-6</span><span class="s0">)</span><span class="s1">, </span><span class="s0">metrics=[</span><span class="s2">'accuracy'</span><span class="s0">])</span>
+        <span class="s0">model_info = model.fit(</span>
+            <span class="s0">train_generator</span><span class="s1">,</span>
+            <span class="s0">steps_per_epoch=num_train // batch_size</span><span class="s1">,</span>
+            <span class="s0">epochs=num_epoch</span><span class="s1">,</span>
+            <span class="s0">validation_data=validation_generator</span><span class="s1">,</span>
+            <span class="s0">validation_steps=num_val // batch_size)</span>
+        <span class="s4">#plot_model_history(model_info)</span>
+        <span class="s0">model.save_weights(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">model.h5'</span><span class="s0">)</span>
+    <span class="s4"># emotions will be displayed on your face from the webcam feed</span>
+    <span class="s1">elif </span><span class="s0">mode == </span><span class="s2">&quot;display&quot;</span><span class="s0">:</span>
+        <span class="s0">model.load_weights(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">model.h5'</span><span class="s0">)</span>
+
+        <span class="s4"># prevents openCL usage and unnecessary logging messages</span>
+        <span class="s0">cv2.ocl.setUseOpenCL(</span><span class="s1">False</span><span class="s0">)</span>
+
+        <span class="s4"># dictionary which assigns each label an emotion (alphabetical order)</span>
+        <span class="s0">emotion_dict = {</span><span class="s5">0</span><span class="s0">: </span><span class="s2">&quot;Angry&quot;</span><span class="s1">, </span><span class="s5">1</span><span class="s0">: </span><span class="s2">&quot;Disgusted&quot;</span><span class="s1">, </span><span class="s5">2</span><span class="s0">: </span><span class="s2">&quot;Fearful&quot;</span><span class="s1">, </span><span class="s5">3</span><span class="s0">: </span><span class="s2">&quot;Happy&quot;</span><span class="s1">, </span><span class="s5">4</span><span class="s0">: </span><span class="s2">&quot;Neutral&quot;</span><span class="s1">, </span><span class="s5">5</span><span class="s0">: </span><span class="s2">&quot;Sad&quot;</span><span class="s1">, </span><span class="s5">6</span><span class="s0">: </span><span class="s2">&quot;Surprised&quot;</span><span class="s0">}</span>
+
+        <span class="s4"># start the webcam feed</span>
+        <span class="s0">cap = cv2.VideoCapture(</span><span class="s5">0</span><span class="s0">)</span>
+        <span class="s1">while True</span><span class="s0">:</span>
+            <span class="s4"># Find haar cascade to draw bounding box around face</span>
+            <span class="s0">ret</span><span class="s1">, </span><span class="s0">frame = cap.read()</span>
+            <span class="s1">if not </span><span class="s0">ret:</span>
+                <span class="s1">break</span>
+            <span class="s0">facecasc = cv2.CascadeClassifier(</span><span class="s2">'C:</span><span class="s1">\\</span><span class="s2">Users</span><span class="s1">\\</span><span class="s2">mnand</span><span class="s1">\\</span><span class="s2">OneDrive</span><span class="s1">\\</span><span class="s2">Desktop</span><span class="s1">\\</span><span class="s2">dizzy_moods</span><span class="s1">\\</span><span class="s2">dizzy_md</span><span class="s1">\\</span><span class="s2">diz</span><span class="s1">\\</span><span class="s2">haarcascade_frontalface_default.xml'</span><span class="s0">)</span>
+            <span class="s0">gray = cv2.cvtColor(frame</span><span class="s1">, </span><span class="s0">cv2.COLOR_BGR2GRAY)</span>
+            <span class="s0">faces = facecasc.detectMultiScale(gray</span><span class="s1">, </span><span class="s0">scaleFactor=</span><span class="s5">1.3</span><span class="s1">, </span><span class="s0">minNeighbors=</span><span class="s5">5</span><span class="s0">)</span>
+
+            <span class="s1">for </span><span class="s0">(x</span><span class="s1">, </span><span class="s0">y</span><span class="s1">, </span><span class="s0">w</span><span class="s1">, </span><span class="s0">h) </span><span class="s1">in </span><span class="s0">faces:</span>
+                <span class="s0">cv2.rectangle(frame</span><span class="s1">, </span><span class="s0">(x</span><span class="s1">, </span><span class="s0">y - </span><span class="s5">50</span><span class="s0">)</span><span class="s1">, </span><span class="s0">(x + w</span><span class="s1">, </span><span class="s0">y + h + </span><span class="s5">10</span><span class="s0">)</span><span class="s1">, </span><span class="s0">(</span><span class="s5">255</span><span class="s1">, </span><span class="s5">0</span><span class="s1">, </span><span class="s5">0</span><span class="s0">)</span><span class="s1">, </span><span class="s5">2</span><span class="s0">)</span>
+                <span class="s0">roi_gray = gray[y:y + h</span><span class="s1">, </span><span class="s0">x:x + w]</span>
+                <span class="s0">cropped_img = np.expand_dims(np.expand_dims(cv2.resize(roi_gray</span><span class="s1">, </span><span class="s0">(</span><span class="s5">48</span><span class="s1">, </span><span class="s5">48</span><span class="s0">))</span><span class="s1">, </span><span class="s0">-</span><span class="s5">1</span><span class="s0">)</span><span class="s1">, </span><span class="s5">0</span><span class="s0">)</span>
+                <span class="s0">prediction = model.predict(cropped_img)</span>
+                <span class="s0">maxindex = int(np.argmax(prediction))</span>
+                <span class="s0">cv2.putText(frame</span><span class="s1">, </span><span class="s0">emotion_dict[maxindex]</span><span class="s1">, </span><span class="s0">(x + </span><span class="s5">20</span><span class="s1">, </span><span class="s0">y - </span><span class="s5">60</span><span class="s0">)</span><span class="s1">, </span><span class="s0">cv2.FONT_HERSHEY_SIMPLEX</span><span class="s1">, </span><span class="s5">1</span><span class="s1">,</span>
+                            <span class="s0">(</span><span class="s5">255</span><span class="s1">, </span><span class="s5">255</span><span class="s1">, </span><span class="s5">255</span><span class="s0">)</span><span class="s1">, </span><span class="s5">2</span><span class="s1">, </span><span class="s0">cv2.LINE_AA)</span>
+
+            <span class="s0">cv2.imshow(</span><span class="s2">'Video'</span><span class="s1">, </span><span class="s0">cv2.resize(frame</span><span class="s1">, </span><span class="s0">(</span><span class="s5">1600</span><span class="s1">, </span><span class="s5">960</span><span class="s0">)</span><span class="s1">, </span><span class="s0">interpolation=cv2.INTER_CUBIC))</span>
+            <span class="s1">if </span><span class="s0">cv2.waitKey(</span><span class="s5">1</span><span class="s0">) &amp; </span><span class="s5">0xFF </span><span class="s0">== ord(</span><span class="s2">'q'</span><span class="s0">):</span>
+                <span class="s1">break</span>
+
+        <span class="s0">cap.release()</span>
+        <span class="s0">cv2.destroyAllWindows()</span>
+    <span class="s1">return </span><span class="s0">HttpResponse(</span><span class="s2">'hello'</span><span class="s0">)</span>
+
+
+
+</pre>
+</body>
+</html>
